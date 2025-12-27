@@ -1,6 +1,8 @@
 # Frontend Integration Guide
 
-## API Endpoint
+## API Endpoints
+
+### Standard Chat (Non-Streaming)
 
 ```
 POST /chat
@@ -12,7 +14,7 @@ Content-Type: application/json
 }
 ```
 
-## Response Format
+**Response:**
 
 ```json
 {
@@ -22,6 +24,57 @@ Content-Type: application/json
     "type": "budget_slider",
     "props": { ... },
     "required": true
+  }
+}
+```
+
+---
+
+### Streaming Chat (SSE)
+
+```
+POST /chat/stream
+Content-Type: application/json
+
+{
+  "message": "Your message here",
+  "session_id": "optional-uuid"
+}
+```
+
+**Event Stream Format:**
+
+| Event Type | Payload                                               |
+| ---------- | ----------------------------------------------------- |
+| `token`    | `{"type": "token", "text": "partial text"}`           |
+| `done`     | `{"type": "done", "session_id": "uuid", "ui": {...}}` |
+| `error`    | `{"type": "error", "message": "..."}`                 |
+
+**React Implementation:**
+
+```jsx
+async function streamChat(message, sessionId, onToken, onComplete) {
+  const response = await fetch("/chat/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, session_id: sessionId }),
+  });
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const lines = decoder.decode(value).split("\n");
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = JSON.parse(line.slice(6));
+        if (data.type === "token") onToken(data.text);
+        if (data.type === "done") onComplete(data);
+      }
+    }
   }
 }
 ```

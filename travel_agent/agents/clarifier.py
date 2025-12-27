@@ -50,7 +50,11 @@ clarifier_agent = Agent(
     
     ---
     
-    GUIDED QUESTIONS (ask in order, 1-2 at a time):
+    CRITICAL: ASK EXACTLY ONE QUESTION AT A TIME.
+    Wait for the user's response before asking the next question.
+    This allows the frontend to render the appropriate UI component for each question.
+    
+    GUIDED QUESTIONS (ask in order, ONE at a time):
     
     1. BASIC INFO (always ask first):
        - Where do you want to go?

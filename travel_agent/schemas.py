@@ -213,42 +213,9 @@ class ChatResponse(BaseModel):
 
 
 # ============================================================
-# UI HINT PATTERNS (for parsing agent output)
+# NOTE: UI Component Selection
 # ============================================================
-
-UI_PATTERNS = {
-    # Keywords that trigger specific UI components
-    "budget": UIType.BUDGET_SLIDER,
-    "how much": UIType.BUDGET_SLIDER,
-    "when are you": UIType.DATE_RANGE_PICKER,
-    "travel dates": UIType.DATE_RANGE_PICKER,
-    "what do you enjoy": UIType.PREFERENCE_CHIPS,
-    "interests": UIType.PREFERENCE_CHIPS,
-    "who's traveling": UIType.COMPANION_SELECTOR,
-    "traveling with": UIType.COMPANION_SELECTOR,
-    "how's this": UIType.RATING_FEEDBACK,
-    "rate": UIType.RATING_FEEDBACK,
-}
-
-
-def detect_ui_component(text: str) -> Optional[UIComponent]:
-    """
-    Detect which UI component to show based on agent response text.
-    Returns None if no special UI needed.
-    """
-    text_lower = text.lower()
-    
-    for pattern, ui_type in UI_PATTERNS.items():
-        if pattern in text_lower:
-            if ui_type == UIType.BUDGET_SLIDER:
-                return UIComponent(type=ui_type, props=BudgetSliderProps(), required=True)
-            elif ui_type == UIType.DATE_RANGE_PICKER:
-                return UIComponent(type=ui_type, props=DateRangePickerProps(), required=True)
-            elif ui_type == UIType.PREFERENCE_CHIPS:
-                return UIComponent(type=ui_type, props=PreferenceChipsProps(), required=True)
-            elif ui_type == UIType.COMPANION_SELECTOR:
-                return UIComponent(type=ui_type, props=CompanionSelectorProps(), required=True)
-            elif ui_type == UIType.RATING_FEEDBACK:
-                return UIComponent(type=ui_type, props=RatingFeedbackProps(), required=False)
-    
-    return None
+# UI components are now selected by the LLM via the render_ui tool
+# in travel_agent/tools/ui_tools.py. The agent calls render_ui()
+# to specify which component to show, and the API extracts it
+# from the tool response.

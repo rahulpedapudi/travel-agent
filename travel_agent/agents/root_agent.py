@@ -23,6 +23,9 @@ from .builder import builder_agent
 from .activity_agent import activity_agent
 from .refinement_agent import refinement_agent
 
+# Import UI tool
+from ..tools import render_ui
+
 
 # Wrap agents as tools
 clarifier_tool = AgentTool(agent=clarifier_agent)
@@ -35,7 +38,7 @@ refinement_tool = AgentTool(agent=refinement_agent)
 root_agent = Agent(
     name="supervisor",
     model="gemini-2.5-flash",
-    tools=[clarifier_tool, researcher_tool, activity_tool, builder_tool, refinement_tool],
+    tools=[clarifier_tool, researcher_tool, activity_tool, builder_tool, refinement_tool, render_ui],
     
     output_key="app:supervisor_response",
     
@@ -74,15 +77,20 @@ root_agent = Agent(
     ❌ "Working on it..."
     ❌ "I'll put together..." (unless you're ACTUALLY doing it in that turn)
     
+    CRITICAL - ONE QUESTION AT A TIME:
+    When gathering information, ask EXACTLY ONE question per response.
+    This allows the frontend to render the appropriate UI component.
+    Do NOT ask multiple questions in a single turn.
+    
     WORKFLOW (do silently, show results):
-    1. If missing info → ASK user (this is the only time to stop and wait)
+    1. If missing info → ASK ONE question (this is the only time to stop and wait)
     2. If have enough info → Call agents → Return final itinerary
     
     EXAMPLE FLOW:
     
     Turn 1:
     User: "Trip to Paris"
-    You: "Ooh Paris! When are you going and what's your budget?"
+    You: "Ooh Paris! When are you thinking of going?"
     
     Turn 2:
     User: "Next week, mid-range budget, romantic trip with my partner"
@@ -102,5 +110,34 @@ root_agent = Agent(
     ERROR HANDLING (sound natural):
     ❌ "An error occurred"
     ✅ "Hmm, I couldn't find that. Can you give me more details?"
+    
+    ---
+    
+    UI COMPONENTS (render_ui tool):
+    When asking the user a question, call render_ui() to show an interactive component.
+    This gives users a better experience than just typing.
+    
+    WHEN TO USE:
+    - Asking about budget → render_ui("budget_slider")
+    - Asking about dates → render_ui("date_range_picker")
+    - Asking about interests → render_ui("preference_chips")
+    - Asking about companions → render_ui("companion_selector")
+    - Offering quick actions → render_ui("quick_actions", {"actions": [...]})
+    
+    EXAMPLES:
+    
+    User: "I want to plan a trip to Tokyo"
+    You: "Tokyo is amazing! When are you planning to go?"
+    [call render_ui("date_range_picker", {"show_presets": true})]
+    
+    User: "Next month"
+    You: "Great! What's your budget for this trip?"
+    [call render_ui("budget_slider", {"min": 50000, "max": 500000, "currency": "INR"})]
+    
+    User: "Around 1 lakh"
+    You: "Who's coming with you on this adventure?"
+    [call render_ui("companion_selector")]
+    
+    IMPORTANT: Call render_ui ALONG WITH your text response, not instead of it.
     """
 )

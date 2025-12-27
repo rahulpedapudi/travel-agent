@@ -38,6 +38,10 @@ from .validation_tools import (
     validate_budget,
 )
 
+from .ui_tools import (
+    render_ui,
+)
+
 
 # Grouped exports by agent - NO google_search in sub-agents!
 # google_search causes "Tool use with function calling is unsupported" in AgentTool
@@ -76,6 +80,7 @@ __all__ = [
     "get_trip_preferences",
     "validate_destination",
     "validate_budget",
+    "render_ui",
     "RESEARCH_TOOLS",
     "BUILDER_TOOLS",
     "CLARIFIER_TOOLS",

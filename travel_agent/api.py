@@ -5,6 +5,7 @@ Production-ready FastAPI backend with Server-Driven UI.
 
 Endpoints:
 - POST /chat - Send message, get response with optional UI component
+- POST /chat/stream - Stream response via Server-Sent Events (SSE)
 - GET /health - Health check
 - DELETE /session/{id} - Clear session
 - GET /ui-schema - Get all UI component schemas
@@ -15,10 +16,12 @@ Run locally:
 
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 import uuid
 import logging
+import json
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -30,7 +33,6 @@ from .schemas import (
     ChatResponse,
     UIComponent,
     UIType,
-    detect_ui_component,
     BudgetSliderProps,
     DateRangePickerProps,
     PreferenceChipsProps,
@@ -103,6 +105,20 @@ async def verify_api_key(x_api_key: Optional[str] = Header(None)):
 # ENDPOINTS
 # ============================================================
 
+def extract_ui_from_tool_response(text: str) -> Optional[dict]:
+    """
+    Extract UI component from render_ui tool response.
+    The tool returns JSON with ui_component key.
+    """
+    try:
+        if text and "ui_component" in text:
+            data = json.loads(text)
+            if "ui_component" in data:
+                return data["ui_component"]
+    except (json.JSONDecodeError, KeyError):
+        pass
+    return None
+
 @app.get("/health")
 async def health_check():
     """Health check for Cloud Run."""
@@ -163,23 +179,39 @@ async def chat(request: ChatRequest, _: bool = Depends(verify_api_key)):
             parts=[types.Part(text=request.message)]
         )
         
-        # Run agent and collect response
+        # Run agent and collect response + UI from tool calls
         response_text = ""
+        ui_data = None
+        
         async for event in runner.run_async(
             session_id=session.id,
             user_id=session_id,
             new_message=content
         ):
-            if hasattr(event, "content") and event.content:
+            if hasattr(event, "content") and event.content and event.content.parts:
                 for part in event.content.parts:
+                    # Collect text response
                     if hasattr(part, "text") and part.text:
                         response_text += part.text
+                    # Check for render_ui tool response
+                    if hasattr(part, "function_response") and part.function_response:
+                        fn_resp = part.function_response
+                        if hasattr(fn_resp, "name") and fn_resp.name == "render_ui":
+                            ui_data = extract_ui_from_tool_response(
+                                fn_resp.response.get("result", "") if fn_resp.response else ""
+                            )
         
         if not response_text:
             response_text = "I'm having trouble processing that. Could you try rephrasing?"
         
-        # Detect UI component based on response text
-        ui_component = detect_ui_component(response_text)
+        # Build UI component from tool call data
+        ui_component = None
+        if ui_data:
+            ui_component = UIComponent(
+                type=UIType(ui_data["type"]),
+                props=ui_data.get("props", {}),
+                required=ui_data.get("required", True)
+            )
         
         return ChatResponse(
             response=response_text,
@@ -205,6 +237,95 @@ async def delete_session(session_id: str, _: bool = Depends(verify_api_key)):
     except Exception as e:
         logger.error(f"Delete session error: {e}")
         return {"message": "Session may not exist"}
+
+
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest, _: bool = Depends(verify_api_key)):
+    """
+    Stream chat response using Server-Sent Events (SSE).
+    
+    Event types:
+    - token: Partial text chunk
+    - done: Final event with session_id and UI component
+    - error: Error message
+    """
+    async def generate():
+        try:
+            session_id = request.session_id or str(uuid.uuid4())
+            
+            # Get or create session
+            session = await session_service.get_session(
+                app_name="travel_agent",
+                user_id=session_id,
+                session_id=session_id
+            )
+            
+            if not session:
+                session = await session_service.create_session(
+                    app_name="travel_agent",
+                    user_id=session_id,
+                    session_id=session_id
+                )
+                logger.info(f"Created new session: {session_id}")
+            
+            # Convert message to ADK format
+            content = types.Content(
+                role="user",
+                parts=[types.Part(text=request.message)]
+            )
+            
+            # Stream tokens and capture UI from tool calls
+            full_response = ""
+            ui_data = None
+            
+            async for event in runner.run_async(
+                session_id=session.id,
+                user_id=session_id,
+                new_message=content
+            ):
+                if hasattr(event, "content") and event.content and event.content.parts:
+                    for part in event.content.parts:
+                        # Stream text chunks
+                        if hasattr(part, "text") and part.text:
+                            full_response += part.text
+                            yield f"data: {json.dumps({'type': 'token', 'text': part.text})}\n\n"
+                        # Capture render_ui tool response
+                        if hasattr(part, "function_response") and part.function_response:
+                            fn_resp = part.function_response
+                            if hasattr(fn_resp, "name") and fn_resp.name == "render_ui":
+                                ui_data = extract_ui_from_tool_response(
+                                    fn_resp.response.get("result", "") if fn_resp.response else ""
+                                )
+            
+            # Build UI component from tool call data
+            ui_component = None
+            if ui_data:
+                ui_component = {
+                    "type": ui_data["type"],
+                    "props": ui_data.get("props", {}),
+                    "required": ui_data.get("required", True)
+                }
+            
+            done_data = {
+                "type": "done",
+                "session_id": session_id,
+                "ui": ui_component
+            }
+            yield f"data: {json.dumps(done_data)}\n\n"
+            
+        except Exception as e:
+            logger.error(f"Stream error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 # ============================================================
