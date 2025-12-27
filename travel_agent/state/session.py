@@ -121,7 +121,7 @@ class RequirementConfidence:
 
 
 # Smart defaults when user doesn't specify
-DEFAULT_BUDGET = "mid-range (approximately $100-200/day)"
+DEFAULT_BUDGET = "mid-range (approximately ₹5,000-10,000/day)"
 DEFAULT_DURATION = "3 days"
 
 

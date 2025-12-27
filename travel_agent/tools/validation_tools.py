@@ -197,18 +197,22 @@ def validate_budget(budget_input: str) -> dict:
             }
     
     # Try to extract numeric amount
-    # Match patterns like: $5000, 5000, 5k, $5k, 5000 USD
-    amount_match = re.search(r'[\$€£]?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)\s*([kK])?', budget_input)
+    # Match patterns like: ₹5000, 5000, 5k, ₹5k, 50000, 1L, 1.5L
+    amount_match = re.search(r'[₹$€£]?\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?)\s*([kKlL])?', budget_input)
     
     if amount_match:
         amount = float(amount_match.group(1).replace(',', ''))
-        if amount_match.group(2):  # k/K multiplier
-            amount *= 1000
+        multiplier = amount_match.group(2)
+        if multiplier:
+            if multiplier.lower() == 'k':
+                amount *= 1000
+            elif multiplier.lower() == 'l':  # Lakh
+                amount *= 100000
         
-        # Categorize based on amount
-        if amount < 500:
+        # Categorize based on amount (INR)
+        if amount < 50000:
             level = "budget"
-        elif amount < 2000:
+        elif amount < 150000:
             level = "mid-range"
         else:
             level = "luxury"
@@ -217,7 +221,7 @@ def validate_budget(budget_input: str) -> dict:
             "valid": True,
             "original": budget_input,
             "amount": amount,
-            "normalized": f"${amount:.0f}",
+            "normalized": f"₹{amount:,.0f}",
             "level": level,
             "confidence": "high"
         }
@@ -226,7 +230,7 @@ def validate_budget(budget_input: str) -> dict:
     return {
         "valid": False,
         "original": budget_input,
-        "error": "Could not parse budget. Use format like '$3000', '5k', or 'mid-range'"
+        "error": "Could not parse budget. Use format like '₹50000', '50k', '1.5L', or 'mid-range'"
     }
 
 

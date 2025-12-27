@@ -1,17 +1,16 @@
 """
 TRAVEL AGENT API
 =================
-Production-ready FastAPI backend for the travel agent.
+Production-ready FastAPI backend with Server-Driven UI.
 
 Endpoints:
-- POST /chat - Send message, get response
+- POST /chat - Send message, get response with optional UI component
 - GET /health - Health check
+- DELETE /session/{id} - Clear session
+- GET /ui-schema - Get all UI component schemas
 
 Run locally:
   uvicorn travel_agent.api:app --reload
-
-Deploy to Cloud Run:
-  gcloud run deploy travel-agent --source .
 """
 
 from fastapi import FastAPI, HTTPException, Depends, Header
@@ -27,6 +26,19 @@ from google.genai import types
 
 from .agents import root_agent
 from .config import get_settings, Settings
+from .schemas import (
+    ChatResponse,
+    UIComponent,
+    UIType,
+    detect_ui_component,
+    BudgetSliderProps,
+    DateRangePickerProps,
+    PreferenceChipsProps,
+    CompanionSelectorProps,
+    ItineraryCardProps,
+    RatingFeedbackProps,
+    QuickActionsProps,
+)
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -39,8 +51,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Travel Agent API",
-    description="AI-powered travel planning assistant",
-    version="1.0.0"
+    description="AI-powered travel planning assistant with Server-Driven UI",
+    version="2.0.0"
 )
 
 # CORS for React frontend
@@ -54,7 +66,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Session storage (in-memory for now, Redis for production scale)
+# Session storage
 session_service = InMemorySessionService()
 
 # ADK Runner
@@ -66,19 +78,13 @@ runner = Runner(
 
 
 # ============================================================
-# REQUEST/RESPONSE MODELS
+# REQUEST MODELS
 # ============================================================
 
 class ChatRequest(BaseModel):
     """Chat request from frontend."""
     message: str
-    session_id: Optional[str] = None  # Auto-generated if not provided
-
-
-class ChatResponse(BaseModel):
-    """Chat response to frontend."""
-    response: str
-    session_id: str
+    session_id: Optional[str] = None
 
 
 # ============================================================
@@ -100,19 +106,40 @@ async def verify_api_key(x_api_key: Optional[str] = Header(None)):
 @app.get("/health")
 async def health_check():
     """Health check for Cloud Run."""
-    return {"status": "healthy", "agent": "travel_agent"}
+    return {"status": "healthy", "agent": "travel_agent", "version": "2.0.0"}
+
+
+@app.get("/ui-schema")
+async def get_ui_schema():
+    """
+    Get all available UI component types and their props.
+    Useful for frontend development and documentation.
+    """
+    return {
+        "components": {
+            "budget_slider": BudgetSliderProps.model_json_schema(),
+            "date_range_picker": DateRangePickerProps.model_json_schema(),
+            "preference_chips": PreferenceChipsProps.model_json_schema(),
+            "companion_selector": CompanionSelectorProps.model_json_schema(),
+            "itinerary_card": ItineraryCardProps.model_json_schema(),
+            "rating_feedback": RatingFeedbackProps.model_json_schema(),
+            "quick_actions": QuickActionsProps.model_json_schema(),
+        },
+        "types": [t.value for t in UIType]
+    }
 
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, _: bool = Depends(verify_api_key)):
     """
-    Process a chat message and return agent response.
+    Process a chat message and return agent response with optional UI.
     
-    - Creates a new session if session_id not provided
-    - Maintains conversation history within session
+    Response includes:
+    - response: Text from the agent
+    - session_id: For maintaining conversation
+    - ui: Optional UI component to render (slider, picker, etc.)
     """
     try:
-        # Generate or use provided session ID
         session_id = request.session_id or str(uuid.uuid4())
         
         # Get or create session
@@ -151,7 +178,14 @@ async def chat(request: ChatRequest, _: bool = Depends(verify_api_key)):
         if not response_text:
             response_text = "I'm having trouble processing that. Could you try rephrasing?"
         
-        return ChatResponse(response=response_text, session_id=session_id)
+        # Detect UI component based on response text
+        ui_component = detect_ui_component(response_text)
+        
+        return ChatResponse(
+            response=response_text,
+            session_id=session_id,
+            ui=ui_component
+        )
         
     except Exception as e:
         logger.error(f"Chat error: {e}")
