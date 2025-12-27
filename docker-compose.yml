@@ -1,0 +1,21 @@
+# ================================================
+# TRAVEL AGENT - LOCAL DEVELOPMENT
+# ================================================
+# Run: docker-compose up
+# API: http://localhost:8080
+# ================================================
+
+version: "3.8"
+
+services:
+  travel-agent:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./travel_agent/.env
+    environment:
+      - ENVIRONMENT=development
+    volumes:
+      - ./travel_agent:/app/travel_agent # Hot reload in dev
+    restart: unless-stopped
