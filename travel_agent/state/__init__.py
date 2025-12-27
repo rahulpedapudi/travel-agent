@@ -8,6 +8,9 @@ from .session import (
     STATE_KEYS,
     DEFAULT_BUDGET,
     DEFAULT_DURATION,
+    TripMode,
+    TripPreferences,
+    TravelCompanions,
     initialize_session_state
 )
 
@@ -20,5 +23,8 @@ __all__ = [
     "STATE_KEYS",
     "DEFAULT_BUDGET",
     "DEFAULT_DURATION",
+    "TripMode",
+    "TripPreferences",
+    "TravelCompanions",
     "initialize_session_state"
 ]

@@ -54,6 +54,62 @@ class ConfidenceLevel(Enum):
     LOW = "low"          # Default/assumed value (e.g., "mid-range" budget if not specified)
 
 
+class TripMode(Enum):
+    """
+    Determines how the agent interacts with the user.
+    
+    GUIDED: Asks detailed questions about preferences
+    SURPRISE_ME: Skips questions, generates optimal plan automatically
+    """
+    GUIDED = "guided"          # Ask user for preferences step by step
+    SURPRISE_ME = "surprise"   # Skip questions, generate best plan
+
+
+class TravelCompanions(Enum):
+    """Who is traveling - affects activity recommendations."""
+    SOLO = "solo"
+    COUPLE = "couple"
+    FAMILY_WITH_KIDS = "family_with_kids"
+    FAMILY_ADULTS = "family_adults"
+    FRIENDS = "friends"
+    BUSINESS = "business"
+
+
+@dataclass
+class TripPreferences:
+    """
+    Detailed user preferences for personalized recommendations.
+    
+    Gathered by enhanced clarifier via guided questions.
+    Used by activity agent to filter and recommend.
+    """
+    # Travel style
+    travel_style: Optional[str] = None  # "adventure", "relaxed", "cultural", "luxury"
+    
+    # Interests (can be multiple)
+    interests: List[str] = field(default_factory=list)  
+    # Options: hiking, food, museums, nightlife, shopping, beaches, nature, history
+    
+    # Companions
+    companions: Optional[TravelCompanions] = None
+    
+    # Accommodation preferences
+    hotel_style: Optional[str] = None  # "luxury", "boutique", "budget", "hostel", "airbnb"
+    
+    # Must-haves and avoids
+    must_haves: List[str] = field(default_factory=list)  # "pool", "breakfast", "wifi", "near_transit"
+    avoids: List[str] = field(default_factory=list)      # "crowds", "long_walks", "spicy_food"
+    
+    # Transport preference
+    transport_pref: Optional[str] = None  # "flights", "trains", "self_drive", "any"
+    
+    # Physical/accessibility
+    accessibility_needs: List[str] = field(default_factory=list)  # "wheelchair", "elevator_required"
+    
+    # Trip mode
+    mode: TripMode = TripMode.GUIDED
+
+
 @dataclass
 class RequirementConfidence:
     """
@@ -148,8 +204,14 @@ STATE_KEYS = {
     # Current workflow phase (WorkflowPhase enum value)
     "phase": "app:workflow_phase",
     
+    # Trip mode (TripMode enum value)
+    "mode": "app:trip_mode",
+    
     # User's travel requirements (TravelRequirements dataclass)
     "requirements": "user:requirements",
+    
+    # User's detailed preferences (TripPreferences dataclass)
+    "preferences": "user:preferences",
     
     # Research findings (ResearchData dataclass)
     "research": "app:research_data",
@@ -178,8 +240,11 @@ def initialize_session_state(state: dict) -> dict:
         The initialized state dictionary
     """
     state[STATE_KEYS["phase"]] = WorkflowPhase.CLARIFYING.value
+    state[STATE_KEYS["mode"]] = TripMode.GUIDED.value
     state[STATE_KEYS["requirements"]] = None
+    state[STATE_KEYS["preferences"]] = None
     state[STATE_KEYS["research"]] = None
     state[STATE_KEYS["itinerary"]] = None
     state[STATE_KEYS["last_error"]] = None
     return state
+
