@@ -1,21 +1,11 @@
 """
 ACTIVITY AGENT
 ===============
-Recommends activities based on user interests and preferences.
-
-USES:
-- TripPreferences from state (interests, travel_style, companions)
-- find_places_nearby tool with filtering
-- Themes: romantic, family-friendly, adventure, cultural, budget
-
-KEY FEATURE: Interest-based filtering
-- User says "I love food and museums" → prioritize food tours + museums
-- Family with kids → filter for kid-friendly activities
-- Adventure style → hiking, outdoor activities
+Recommends activities based on user interests.
 """
 
 from google.adk.agents import Agent
-from ..tools import find_places_nearby, get_current_datetime
+from ..tools import find_places_nearby
 
 
 def filter_activities_by_interest(
@@ -24,22 +14,10 @@ def filter_activities_by_interest(
     companions: str = None,
     avoids: list = None
 ) -> dict:
-    """
-    Filter and score activities based on user preferences.
-    
-    Args:
-        activities: List of activities from find_places_nearby
-        interests: User interests like ["food", "museums", "hiking"]
-        companions: Who's traveling (solo, couple, family_with_kids, etc.)
-        avoids: Things to avoid like ["crowds", "long_walks"]
-    
-    Returns:
-        Filtered and scored activities with recommendations
-    """
+    """Filter activities by user preferences."""
     if not activities:
         return {"filtered": [], "message": "No activities to filter"}
     
-    # Activity type mapping to interests
     interest_mapping = {
         "food": ["restaurant", "cafe", "bar", "bakery", "food_tour"],
         "museums": ["museum", "gallery", "art"],
@@ -52,10 +30,7 @@ def filter_activities_by_interest(
         "adventure": ["adventure", "outdoor", "sports", "hiking"]
     }
     
-    # Kid-friendly indicators
     kid_friendly = ["park", "zoo", "aquarium", "museum", "beach", "garden"]
-    
-    # Romantic indicators
     romantic = ["restaurant", "spa", "garden", "sunset", "rooftop"]
     
     scored = []
@@ -66,7 +41,6 @@ def filter_activities_by_interest(
         score = 0
         tags = []
         
-        # Score by interests
         for interest in interests:
             if interest.lower() in interest_mapping:
                 for keyword in interest_mapping[interest.lower()]:
@@ -75,7 +49,6 @@ def filter_activities_by_interest(
                         tags.append(interest)
                         break
         
-        # Companion-based scoring
         if companions == "family_with_kids":
             for kf in kid_friendly:
                 if kf in name_lower:
@@ -89,26 +62,15 @@ def filter_activities_by_interest(
                     tags.append("romantic")
                     break
         
-        # Penalty for avoids
         if avoids:
             for avoid in avoids:
                 if avoid.lower() in name_lower:
                     score -= 10
         
-        scored.append({
-            **activity,
-            "match_score": score,
-            "tags": list(set(tags))
-        })
+        scored.append({**activity, "match_score": score, "tags": list(set(tags))})
     
-    # Sort by score
     scored.sort(key=lambda x: x["match_score"], reverse=True)
-    
-    return {
-        "total": len(scored),
-        "top_matches": scored[:5],
-        "all_filtered": scored
-    }
+    return {"total": len(scored), "top_matches": scored[:5], "all_filtered": scored}
 
 
 activity_agent = Agent(
@@ -117,44 +79,39 @@ activity_agent = Agent(
     tools=[find_places_nearby, filter_activities_by_interest],
     
     instruction="""
-    You are an Activity Recommendation Agent.
-    Your job is to suggest activities tailored to user preferences.
+    You recommend activities based on what the user enjoys.
     
-    AVAILABLE TOOLS:
-    - find_places_nearby: Find attractions, restaurants, etc. by location
-    - filter_activities_by_interest: Score activities by user interests
+    LANGUAGE RULES - VERY IMPORTANT:
+    - NEVER mention "tools", "filters", "algorithms"
+    - NEVER say "based on my search" or "my filtering shows"
+    - Talk like a friend who knows great spots
     
-    USER PREFERENCES TO CONSIDER:
-    - Interests: food, museums, hiking, nightlife, shopping, beaches, etc.
-    - Companions: solo, couple, family_with_kids, friends
-    - Travel style: adventure, relaxed, cultural, luxury
-    - Avoids: crowds, long_walks, spicy_food, etc.
+    ❌ DON'T SAY: "Based on your interest filters, I found..."
+    ✅ SAY: "Since you love food, you'll definitely want to try..."
     
-    YOUR PROCESS:
+    ❌ DON'T SAY: "The activity matching algorithm suggests..."
+    ✅ SAY: "For a romantic dinner, I'd pick..."
     
-    1. Check user preferences from context/state
-    2. Use find_places_nearby to get activities for the destination
-    3. Use filter_activities_by_interest to score and rank them
-    4. Recommend top activities with explanations
+    YOUR JOB:
+    Based on user's interests (food, museums, nightlife, etc.), recommend:
+    - Things that match what they enjoy
+    - Kid-friendly spots if traveling with family
+    - Romantic options for couples
+    - Avoid things they said they don't like
     
-    OUTPUT FORMAT:
-    For each recommended activity:
-    - Name and type
-    - Why it matches their preferences (e.g., "Perfect for food lovers!")
-    - Best time to visit
-    - Any tips
+    OUTPUT (conversational):
     
-    THEMES TO APPLY:
-    - "romantic" → candlelit restaurants, sunset spots, spas
-    - "family-friendly" → parks, zoos, interactive museums
-    - "adventure" → hiking, water sports, outdoor activities
-    - "cultural" → museums, temples, historical sites
-    - "budget" → free parks, walking tours, street food
+    "Since you mentioned you love [interest], here's what I'd recommend:
     
-    If user says "kid-friendly", prioritize:
-    - Parks and playgrounds
-    - Interactive museums
-    - Aquariums/zoos
-    - Avoid bars/nightlife
+    🍜 For foodies:
+    - [Restaurant] - This place is amazing for [dish]!
+    
+    🏛️ Culture lovers will enjoy:
+    - [Museum] - Don't miss the [exhibit]
+    
+    🌙 For nightlife:
+    - [Bar/Club] - Great vibe, especially on weekends"
+    
+    Make it personal and enthusiastic!
     """
 )
