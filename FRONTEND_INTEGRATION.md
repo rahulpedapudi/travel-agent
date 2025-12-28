@@ -44,16 +44,20 @@ Content-Type: application/json
 
 **Event Stream Format:**
 
-| Event Type | Payload                                               |
-| ---------- | ----------------------------------------------------- |
-| `token`    | `{"type": "token", "text": "partial text"}`           |
-| `done`     | `{"type": "done", "session_id": "uuid", "ui": {...}}` |
-| `error`    | `{"type": "error", "message": "..."}`                 |
+| Event Type      | Payload                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| `token`         | `{"type": "token", "text": "partial text"}`                                                    |
+| `thinking`      | `{"type": "thinking", "message": "Searching...", "tool": "find_places_nearby"}`                |
+| `plan`          | `{"type": "plan", "tasks": [{"id": "research", "label": "Researching", "status": "pending"}]}` |
+| `task_start`    | `{"type": "task_start", "taskId": "research", "label": "Researching destinations"}`            |
+| `task_complete` | `{"type": "task_complete", "taskId": "research"}`                                              |
+| `done`          | `{"type": "done", "session_id": "uuid", "ui": {...}}`                                          |
+| `error`         | `{"type": "error", "message": "..."}`                                                          |
 
 **React Implementation:**
 
 ```jsx
-async function streamChat(message, sessionId, onToken, onComplete) {
+async function streamChat(message, sessionId, onToken, onThinking, onComplete) {
   const response = await fetch("/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -72,6 +76,10 @@ async function streamChat(message, sessionId, onToken, onComplete) {
       if (line.startsWith("data: ")) {
         const data = JSON.parse(line.slice(6));
         if (data.type === "token") onToken(data.text);
+        if (data.type === "thinking") onThinking(data.message);
+        if (data.type === "plan") onPlan(data.tasks);
+        if (data.type === "task_start") onTaskStart(data.taskId);
+        if (data.type === "task_complete") onTaskComplete(data.taskId);
         if (data.type === "done") onComplete(data);
       }
     }

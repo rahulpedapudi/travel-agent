@@ -36,6 +36,7 @@ class UIType(str, Enum):
     
     # Display components
     ITINERARY_CARD = "itinerary_card"
+    ITINERARY_TIMELINE = "itinerary_timeline"
     PLACE_CARD = "place_card"
     DAY_SUMMARY = "day_summary"
     
@@ -140,6 +141,29 @@ class ItineraryCardProps(BaseModel):
     allow_actions: bool = Field(True, description="Show swap/add buttons")
 
 
+class TimelineSegment(BaseModel):
+    """Single segment in a timeline (departure, arrival, transfer, activity)."""
+    time: str = Field(..., description="Time in HH:MM format, e.g., '14:10'")
+    title: str = Field(..., description="Location or activity name")
+    type: str = Field(..., description="departure, arrival, transfer, activity, transit")
+    duration: Optional[str] = Field(None, description="Duration, e.g., '3h 25m'")
+    carrier: Optional[str] = Field(None, description="Airline/train name, e.g., 'Lufthansa LH1445'")
+    vehicle: Optional[str] = Field(None, description="Vehicle type, e.g., 'Airbus A320-212'")
+    class_type: Optional[str] = Field(None, description="Economy, Business, etc.")
+    notes: List[str] = Field(default=[], description="Additional notes or tips")
+    location: Optional[dict] = Field(None, description="Location details: {name, address, lat, lng}")
+    image_url: Optional[str] = Field(None, description="Optional image URL")
+
+
+class ItineraryTimelineProps(BaseModel):
+    """Props for itinerary_timeline component (visual timeline display)."""
+    day_number: int = Field(..., description="Day 1, 2, 3, etc.")
+    date: str = Field(..., description="Date string, e.g., 'Thu, Jul 8'")
+    route: str = Field(..., description="Route summary, e.g., 'Washington → London'")
+    total_duration: Optional[str] = Field(None, description="Total duration, e.g., '10h'")
+    segments: List[TimelineSegment] = Field(default=[], description="Timeline segments")
+
+
 class PlaceCardProps(BaseModel):
     """Props for place_card component (hotel, restaurant, attraction)."""
     name: str
@@ -177,6 +201,7 @@ class UIComponent(BaseModel):
         QuickActionsProps,
         RatingFeedbackProps,
         ItineraryCardProps,
+        ItineraryTimelineProps,
         PlaceCardProps,
         ConfirmationProps,
         dict  # Fallback for unknown types
