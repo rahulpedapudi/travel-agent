@@ -58,6 +58,28 @@ limiter = Limiter(key_func=get_remote_address)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# --- MONKEY PATCH FOR ADK LIBRARY BUG ---
+# Fixes TypeError: 'NoneType' object is not iterable in agent_tool.py
+try:
+    from google.adk.tools import agent_tool
+    original_run_async = agent_tool.AgentTool.run_async
+
+    async def patched_run_async(self, *args, **kwargs):
+        try:
+            return await original_run_async(self, *args, **kwargs)
+        except TypeError as e:
+            if "'NoneType' object is not iterable" in str(e):
+                logger.warning(f"Caught ADK library bug in AgentTool ({self.name}): {e}. Returning empty success.")
+                # Return a simple dict - ADK will handle serialization
+                return {"output": "Agent completed but returned no content."}
+            raise e
+
+    agent_tool.AgentTool.run_async = patched_run_async
+    logger.info("Applied AgentTool monkey patch for stability")
+except ImportError:
+    logger.warning("Could not apply AgentTool monkey patch - library not found")
+# ----------------------------------------
+
 
 # ============================================================
 # APP SETUP
@@ -561,6 +583,8 @@ async def chat_stream(request: Request, body: ChatRequest, user: dict = Depends(
             
         except Exception as e:
             logger.error(f"Stream error: {e}")
+            import traceback
+            traceback.print_exc()
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
     
     return StreamingResponse(

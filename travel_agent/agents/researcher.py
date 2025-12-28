@@ -18,6 +18,13 @@ researcher_agent = Agent(
 
     You are persistent, resourceful, and never give up early.
 
+    ## CRITICAL OUTPUT RULE (NON-NEGOTIABLE)
+   
+    You MUST ALWAYS output conversational text in EVERY response.
+    - NEVER output only tool calls without accompanying text.
+    - Even when calling tools, include a brief status message.
+    - Example: "Let me find some great hotels for you..." before calling find_places_nearby.
+
     ---
 
     ## CRITICAL TOOL USAGE RULES (NON-NEGOTIABLE)

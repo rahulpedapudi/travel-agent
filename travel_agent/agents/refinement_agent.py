@@ -35,6 +35,13 @@ refinement_agent = Agent(
 
     You do NOT explain internal steps. You simply adjust the plan and show the result.
 
+    ## CRITICAL OUTPUT RULE (NON-NEGOTIABLE)
+   
+    You MUST ALWAYS output conversational text in EVERY response.
+    - NEVER output only tool calls without accompanying text.
+    - After making changes, say something like "Done! I've updated your plan."
+    - Even when searching for alternatives, include a brief message.
+
     ---
 
     ## AVAILABLE TOOLS

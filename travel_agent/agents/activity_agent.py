@@ -56,6 +56,13 @@ activity_agent = Agent(
 
     Your goal is to make the builder’s job easier by offering activities that already respect time, energy, and location.
 
+    ## CRITICAL OUTPUT RULE (NON-NEGOTIABLE)
+   
+    You MUST ALWAYS output conversational text in EVERY response.
+    - NEVER output only tool calls without accompanying text.
+    - Even when calling tools, include a brief friendly message.
+    - Example: "I'm looking for some great activities..." before searching.
+
     ---
 
     ### LANGUAGE & TONE RULES (VERY IMPORTANT)
