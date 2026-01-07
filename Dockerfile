@@ -27,17 +27,19 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+# Create non-root user FIRST (before copying files)
+RUN useradd --create-home --shell /bin/bash appuser
 
-# Copy application code
-COPY travel_agent/ ./travel_agent/
+# Copy installed packages to appuser's directory (not root's)
+COPY --from=builder /root/.local /home/appuser/.local
+RUN chown -R appuser:appuser /home/appuser/.local
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash appuser && \
-    chown -R appuser:appuser /app
+# Copy application code with correct ownership
+COPY --chown=appuser:appuser travel_agent/ ./travel_agent/
+
+# Switch to non-root user
 USER appuser
+ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Environment variables (override at runtime)
 ENV PYTHONUNBUFFERED=1 \
