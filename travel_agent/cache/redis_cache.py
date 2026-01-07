@@ -48,15 +48,74 @@ class RedisCache(CacheBackend):
     """Redis-backed cache."""
     
     def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0):
-        self.client = redis.Redis(host=host, port=port, db=db, decode_responses=True)
+        self.client = redis.Redis(
+            host=host, 
+            port=port, 
+            db=db, 
+            decode_responses=True,
+            socket_timeout=3,
+            socket_connect_timeout=3
+        )
+        self.connected = False
         # Test connection
         try:
             self.client.ping()
             self.connected = True
             logger.info(f"Redis connected: {host}:{port}")
-        except redis.ConnectionError:
+        except (redis.ConnectionError, redis.TimeoutError, Exception) as e:
             self.connected = False
-            logger.warning(f"Redis connection failed: {host}:{port}")
+            logger.warning(f"Redis connection failed: {host}:{port} - {e}")
+    
+    def get(self, key: str) -> Optional[Any]:
+        if not self.connected:
+            return None
+        try:
+            data = self.client.get(key)
+            return json.loads(data) if data else None
+        except Exception as e:
+            logger.error(f"Redis get error: {e}")
+            return None
+    
+    def set(self, key: str, value: Any, ttl: int = 86400) -> bool:
+        if not self.connected:
+            return False
+        try:
+            self.client.setex(key, ttl, json.dumps(value))
+            return True
+        except Exception as e:
+            logger.error(f"Redis set error: {e}")
+            return False
+    
+    def delete(self, key: str) -> bool:
+        if not self.connected:
+            return False
+        try:
+            self.client.delete(key)
+            return True
+        except Exception as e:
+            logger.error(f"Redis delete error: {e}")
+            return False
+
+class RedisUrlCache(CacheBackend):
+    """Redis-backed cache using URL connection string."""
+    
+    def __init__(self, url: str):
+        # Add timeout to prevent blocking on unreachable Redis
+        self.client = redis.from_url(
+            url, 
+            decode_responses=True,
+            socket_timeout=3,  # 3 second timeout for operations
+            socket_connect_timeout=3  # 3 second timeout for connection
+        )
+        self.connected = False
+        # Test connection
+        try:
+            self.client.ping()
+            self.connected = True
+            logger.info(f"Redis connected via URL")
+        except (redis.ConnectionError, redis.TimeoutError, Exception) as e:
+            self.connected = False
+            logger.warning(f"Redis URL connection failed: {e}")
     
     def get(self, key: str) -> Optional[Any]:
         if not self.connected:
@@ -125,13 +184,23 @@ class InMemoryCache(CacheBackend):
 # Initialize the cache
 def get_cache() -> CacheBackend:
     """Get the appropriate cache backend."""
-    redis_url = os.getenv("REDIS_URL", "localhost")
-    redis_port = int(os.getenv("REDIS_PORT", "6379"))
+    redis_url = os.getenv("REDIS_URL")
     
-    if REDIS_AVAILABLE:
-        cache = RedisCache(host=redis_url, port=redis_port)
-        if cache.connected:
-            return cache
+    if REDIS_AVAILABLE and redis_url:
+        # Check if it's a full URL (redis://...) or just a hostname
+        if redis_url.startswith("redis://") or redis_url.startswith("rediss://"):
+            try:
+                cache = RedisUrlCache(redis_url)
+                if cache.connected:
+                    return cache
+            except Exception as e:
+                logger.warning(f"Redis URL connection failed: {e}")
+        else:
+            # Treat as hostname
+            redis_port = int(os.getenv("REDIS_PORT", "6379"))
+            cache = RedisCache(host=redis_url, port=redis_port)
+            if cache.connected:
+                return cache
     
     return InMemoryCache()
 

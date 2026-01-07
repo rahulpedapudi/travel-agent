@@ -58,24 +58,47 @@ limiter = Limiter(key_func=get_remote_address)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- MONKEY PATCH FOR ADK LIBRARY BUG ---
-# Fixes TypeError: 'NoneType' object is not iterable in agent_tool.py
+# --- MONKEY PATCH FOR ADK LIBRARY BUGS ---
+# 1. Fixes TypeError: 'NoneType' object is not iterable in agent_tool.py
+# 2. Handles Gemini 503 "model overloaded" errors with retry
+import asyncio
+
 try:
     from google.adk.tools import agent_tool
+    from google.genai import errors as genai_errors
     original_run_async = agent_tool.AgentTool.run_async
 
     async def patched_run_async(self, *args, **kwargs):
-        try:
-            return await original_run_async(self, *args, **kwargs)
-        except TypeError as e:
-            if "'NoneType' object is not iterable" in str(e):
-                logger.warning(f"Caught ADK library bug in AgentTool ({self.name}): {e}. Returning empty success.")
-                # Return a simple dict - ADK will handle serialization
-                return {"output": "Agent completed but returned no content."}
-            raise e
+        max_retries = 3
+        base_delay = 2  # seconds
+        
+        for attempt in range(max_retries + 1):
+            try:
+                return await original_run_async(self, *args, **kwargs)
+            except TypeError as e:
+                if "'NoneType' object is not iterable" in str(e):
+                    logger.warning(f"Caught ADK library bug in AgentTool ({self.name}): {e}. Returning empty success.")
+                    return {"output": "Agent completed but returned no content."}
+                raise e
+            except genai_errors.ServerError as e:
+                # Handle Gemini 503 "model overloaded" errors
+                if "503" in str(e) or "overloaded" in str(e).lower():
+                    if attempt < max_retries:
+                        delay = base_delay * (2 ** attempt)  # Exponential backoff: 2s, 4s, 8s
+                        logger.warning(f"Gemini API overloaded (attempt {attempt + 1}/{max_retries + 1}). Retrying in {delay}s...")
+                        await asyncio.sleep(delay)
+                        continue
+                    else:
+                        logger.error(f"Gemini API overloaded after {max_retries + 1} attempts. Giving up.")
+                        return {"output": "The AI service is currently busy. Please try again in a moment.", "error": True}
+                raise e
+            except Exception as e:
+                # Log unexpected errors but don't retry them
+                logger.error(f"Unexpected error in AgentTool ({self.name}): {e}")
+                raise e
 
     agent_tool.AgentTool.run_async = patched_run_async
-    logger.info("Applied AgentTool monkey patch for stability")
+    logger.info("Applied AgentTool monkey patch for stability and retry logic")
 except ImportError:
     logger.warning("Could not apply AgentTool monkey patch - library not found")
 # ----------------------------------------
