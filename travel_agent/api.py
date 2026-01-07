@@ -54,9 +54,9 @@ from starlette.requests import Request
 
 limiter = Limiter(key_func=get_remote_address)
 
-# Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Structured Logging
+from .logging import get_logger, RequestLogger
+logger = get_logger("api")
 
 # --- MONKEY PATCH FOR ADK LIBRARY BUGS ---
 # 1. Fixes TypeError: 'NoneType' object is not iterable in agent_tool.py
@@ -441,11 +441,27 @@ async def chat_stream(request: Request, body: ChatRequest, user: dict = Depends(
     """
 
     async def generate():
+        # Use Firebase user ID for session (ensures each user has their own conversation)
+        user_id = user["uid"]
+        # Generate unique session_id if not provided (for new chats)
+        session_id = body.session_id or str(uuid.uuid4())
+        
+        # Initialize request logger
+        req_log = RequestLogger(
+            session_id=session_id,
+            user_id=user_id,
+            endpoint="/chat/stream"
+        )
+        
         try:
-            # Use Firebase user ID for session (ensures each user has their own conversation)
-            user_id = user["uid"]
-            # Generate unique session_id if not provided (for new chats)
-            session_id = body.session_id or str(uuid.uuid4())
+            req_log.log.info(
+                "request_started",
+                session_id=session_id,
+                user_id=user_id,
+                message_length=len(body.message),
+            )
+            import time
+            start_time = time.time()
             
             # Set context for state tools
             session_context.set(session_id)
@@ -465,7 +481,7 @@ async def chat_stream(request: Request, body: ChatRequest, user: dict = Depends(
                 )
                 # Record session ownership for security
                 redis_state.set_owner(session_id, user_id)
-                logger.info(f"Created new session for user {user_id}: {session_id}")
+                logger.info("session_created", user_id=user_id, session_id=session_id)
             
             
             # Convert message to ADK format
@@ -543,6 +559,9 @@ async def chat_stream(request: Request, body: ChatRequest, user: dict = Depends(
                             }
                             message = thinking_messages.get(tool_name, f"Working on it...")
                             yield f"data: {json.dumps({'type': 'thinking', 'message': message, 'tool': tool_name})}\n\n"
+                            
+                            # Log tool call
+                            req_log.log_tool_call(tool_name)
                         
                         # 3. EMIT: Task Complete
                         # When we get a function response from a sub-agent
@@ -604,8 +623,27 @@ async def chat_stream(request: Request, body: ChatRequest, user: dict = Depends(
             }
             yield f"data: {json.dumps(done_data)}\n\n"
             
+            # Log request completion
+            duration_ms = (time.time() - start_time) * 1000
+            req_log.log.info(
+                "request_completed",
+                session_id=session_id,
+                duration_ms=round(duration_ms, 2),
+                tool_calls=req_log.tool_calls,
+                tool_count=len(req_log.tool_calls),
+                response_length=len(full_response),
+            )
+            
         except Exception as e:
-            logger.error(f"Stream error: {e}")
+            duration_ms = (time.time() - start_time) * 1000 if 'start_time' in locals() else 0
+            req_log.log.error(
+                "request_failed",
+                session_id=session_id if 'session_id' in locals() else "unknown",
+                duration_ms=round(duration_ms, 2),
+                error_type=type(e).__name__,
+                error_message=str(e),
+                tool_calls=req_log.tool_calls if 'req_log' in locals() else [],
+            )
             import traceback
             traceback.print_exc()
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"

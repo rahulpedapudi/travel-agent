@@ -11,3 +11,4 @@ pytz>=2024.1
 firebase-admin
 redis>=5.0.0
 slowapi>=0.1.9
+structlog>=24.1.0
