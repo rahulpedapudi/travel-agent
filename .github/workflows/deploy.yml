@@ -7,7 +7,7 @@ on:
 
 env:
   PROJECT_ID: techsprint-482415
-  REGION: us-central1
+  REGION: asia-south1
   SERVICE: travel-agent
 
 jobs:
