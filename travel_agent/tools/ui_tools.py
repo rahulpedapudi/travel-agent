@@ -177,3 +177,117 @@ def set_chat_title(title: str) -> str:
         "chat_title": title
     })
 
+
+def render_map(
+    markers: List[dict],
+    center: Optional[dict] = None,
+    zoom: int = 13,
+    title: Optional[str] = None
+) -> str:
+    """
+    Render an interactive map with markers for places.
+    Call this to show researched locations on a map.
+    
+    Args:
+        markers: List of marker objects, each with:
+            - lat: float (required) - Latitude
+            - lng: float (required) - Longitude
+            - title: str (required) - Place name
+            - type: str - "hotel", "attraction", "restaurant", "activity"
+            - description: str (optional) - Brief description
+            - day: int (optional) - Day number for color coding
+        
+        center: Map center point {"lat": float, "lng": float}
+                If not provided, auto-centers on first marker.
+        
+        zoom: Map zoom level (1-20, default 13)
+        
+        title: Optional title for the map
+    
+    Returns:
+        JSON with map_view UI component.
+    
+    Example:
+        render_map([
+            {"lat": 35.6586, "lng": 139.7454, "title": "Tokyo Tower", "type": "attraction"},
+            {"lat": 35.6762, "lng": 139.6503, "title": "Park Hyatt Tokyo", "type": "hotel"},
+            {"lat": 35.7101, "lng": 139.8107, "title": "Senso-ji Temple", "type": "attraction"}
+        ], title="Tokyo Trip Locations")
+    """
+    # Auto-center on first marker if no center provided
+    if not center and markers:
+        center = {"lat": markers[0]["lat"], "lng": markers[0]["lng"]}
+    elif not center:
+        center = {"lat": 0, "lng": 0}
+    
+    return json.dumps({
+        "ui_component": {
+            "type": "map_view",
+            "props": {
+                "center": center,
+                "zoom": zoom,
+                "markers": markers,
+                "title": title
+            },
+            "required": False
+        }
+    })
+
+
+def render_route(
+    origin: dict,
+    destination: dict,
+    waypoints: Optional[List[dict]] = None,
+    travel_mode: str = "TRANSIT",
+    day_number: Optional[int] = None
+) -> str:
+    """
+    Render a map with a route/path between locations.
+    Call this to show the day's journey with directions.
+    
+    Args:
+        origin: Start point {"lat": float, "lng": float, "title": str}
+        
+        destination: End point {"lat": float, "lng": float, "title": str}
+        
+        waypoints: List of intermediate stops, each with:
+            - lat: float (required)
+            - lng: float (required)
+            - title: str (required)
+            - order: int (required) - Stop order (1, 2, 3...)
+            - arrival_time: str (optional) - e.g., "10:30"
+        
+        travel_mode: One of "DRIVING", "WALKING", "TRANSIT", "BICYCLING"
+                     Default is "TRANSIT"
+        
+        day_number: Day number for labeling (optional)
+    
+    Returns:
+        JSON with route_view UI component.
+    
+    Example:
+        render_route(
+            origin={"lat": 35.6762, "lng": 139.6503, "title": "Hotel"},
+            destination={"lat": 35.7101, "lng": 139.8107, "title": "Senso-ji Temple"},
+            waypoints=[
+                {"lat": 35.6895, "lng": 139.6917, "title": "Harajuku", "order": 1, "arrival_time": "10:00"},
+                {"lat": 35.6586, "lng": 139.7454, "title": "Tokyo Tower", "order": 2, "arrival_time": "12:00"}
+            ],
+            travel_mode="TRANSIT",
+            day_number=1
+        )
+    """
+    return json.dumps({
+        "ui_component": {
+            "type": "route_view",
+            "props": {
+                "origin": origin,
+                "destination": destination,
+                "waypoints": waypoints or [],
+                "travel_mode": travel_mode,
+                "day_number": day_number,
+                "show_traffic": False
+            },
+            "required": False
+        }
+    })

@@ -39,6 +39,8 @@ class UIType(str, Enum):
     ITINERARY_TIMELINE = "itinerary_timeline"
     PLACE_CARD = "place_card"
     DAY_SUMMARY = "day_summary"
+    MAP_VIEW = "map_view"  # Map with markers
+    ROUTE_VIEW = "route_view"  # Map with path/directions
     
     # Action components
     QUICK_ACTIONS = "quick_actions"
@@ -187,6 +189,61 @@ class ConfirmationProps(BaseModel):
 
 
 # ============================================================
+# MAP COMPONENTS
+# ============================================================
+
+class MapMarker(BaseModel):
+    """A single marker on the map."""
+    lat: float = Field(..., description="Latitude")
+    lng: float = Field(..., description="Longitude")
+    title: str = Field(..., description="Marker title/name")
+    type: Literal["hotel", "attraction", "restaurant", "activity"] = Field(
+        "attraction", description="Marker type for styling"
+    )
+    description: Optional[str] = Field(None, description="Optional description")
+    day: Optional[int] = Field(None, description="Day number for color coding")
+
+
+class MapViewProps(BaseModel):
+    """Props for map_view component - shows pins on a map."""
+    center: dict = Field(
+        ..., 
+        description="Map center: {'lat': 35.6762, 'lng': 139.6503}"
+    )
+    zoom: int = Field(13, description="Map zoom level (1-20)")
+    markers: List[MapMarker] = Field(
+        default=[], 
+        description="List of markers to display"
+    )
+    title: Optional[str] = Field(None, description="Map title")
+
+
+class RouteWaypoint(BaseModel):
+    """A waypoint in a route."""
+    lat: float
+    lng: float
+    title: str
+    order: int = Field(..., description="Stop order (1, 2, 3...)")
+    arrival_time: Optional[str] = Field(None, description="Expected arrival time")
+
+
+class RouteViewProps(BaseModel):
+    """Props for route_view component - shows path between locations."""
+    origin: dict = Field(..., description="Start point: {'lat': x, 'lng': y, 'title': 'Hotel'}")
+    destination: dict = Field(..., description="End point: {'lat': x, 'lng': y, 'title': 'Airport'}")
+    waypoints: List[RouteWaypoint] = Field(
+        default=[], 
+        description="Intermediate stops"
+    )
+    travel_mode: Literal["DRIVING", "WALKING", "TRANSIT", "BICYCLING"] = Field(
+        "TRANSIT", 
+        description="Travel mode for directions"
+    )
+    day_number: Optional[int] = Field(None, description="Day this route belongs to")
+    show_traffic: bool = Field(False, description="Show traffic layer")
+
+
+# ============================================================
 # UI COMPONENT WRAPPER
 # ============================================================
 
@@ -204,6 +261,8 @@ class UIComponent(BaseModel):
         ItineraryTimelineProps,
         PlaceCardProps,
         ConfirmationProps,
+        MapViewProps,
+        RouteViewProps,
         dict  # Fallback for unknown types
     ] = Field(default_factory=dict)
     required: bool = Field(False, description="Whether user must interact before continuing")

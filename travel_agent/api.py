@@ -153,6 +153,10 @@ try:
 except Exception as e:
     logger.warning(f"Firebase not initialized (auth disabled): {e}")
 
+# Log the LLM model being used
+from .config import LLM_MODEL
+logger.info(f"LLM Model: {LLM_MODEL}")
+
 
 # ============================================================
 # REQUEST MODELS
@@ -262,6 +266,9 @@ async def chat(request: ChatRequest, user: dict = Depends(get_current_user)):
                 session_id=session_id
             )
             logger.info(f"Created new session for user {user_id}: {session_id}")
+        
+        # Set context for state tools (CRITICAL for preference persistence)
+        session_context.set(session_id)
         
         # Convert message to ADK format
         content = types.Content(

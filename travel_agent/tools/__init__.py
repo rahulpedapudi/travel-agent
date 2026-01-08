@@ -66,6 +66,8 @@ from .ui_tools import (
     render_ui,
     render_itinerary_card,
     set_chat_title,
+    render_map,
+    render_route,
 )
 
 
@@ -88,6 +90,8 @@ BUILDER_TOOLS = [
     get_preferences,  # Read preferences from state
     set_itinerary,  # Save final itinerary
     render_ui,  # Trigger UI display
+    render_map,  # Show map with pins
+    render_route,  # Show route/path
 ]
 
 CLARIFIER_TOOLS = [

@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     port: int = Field(8080, description="Server port")
     host: str = Field("0.0.0.0", description="Server host")
     
+    # LLM Model
+    llm_model: str = Field("gemini-2.5-flash", description="LLM model for all agents")
+    
     # CORS
     allowed_origins: str = Field("*", description="Comma-separated allowed origins")
     
@@ -37,3 +40,9 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
+
+
+# Module-level constant for LLM model - safe to import at module level
+# This uses environment variable directly to avoid circular import issues
+import os
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
