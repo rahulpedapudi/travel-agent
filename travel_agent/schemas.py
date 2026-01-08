@@ -41,6 +41,7 @@ class UIType(str, Enum):
     DAY_SUMMARY = "day_summary"
     MAP_VIEW = "map_view"  # Map with markers
     ROUTE_VIEW = "route_view"  # Map with path/directions
+    FLIGHT_CARD = "flight_card"  # Flight options display
     
     # Action components
     QUICK_ACTIONS = "quick_actions"
@@ -244,6 +245,48 @@ class RouteViewProps(BaseModel):
 
 
 # ============================================================
+# FLIGHT COMPONENTS
+# ============================================================
+
+class FlightSegment(BaseModel):
+    """A single flight leg."""
+    departure_airport: str = Field(..., description="Departure airport code, e.g., 'DEL'")
+    departure_city: str = Field(..., description="Departure city name")
+    departure_time: str = Field(..., description="Departure time, e.g., '14:30'")
+    arrival_airport: str = Field(..., description="Arrival airport code, e.g., 'NRT'")
+    arrival_city: str = Field(..., description="Arrival city name")
+    arrival_time: str = Field(..., description="Arrival time, e.g., '22:45'")
+    duration: str = Field(..., description="Flight duration, e.g., '6h 15m'")
+    airline: str = Field(..., description="Airline name")
+    flight_number: str = Field(..., description="Flight number, e.g., 'NH828'")
+    aircraft: Optional[str] = Field(None, description="Aircraft type, e.g., 'Boeing 787'")
+    cabin_class: str = Field("Economy", description="Economy, Business, First")
+
+
+class FlightOption(BaseModel):
+    """A complete flight option (may have multiple segments for connections)."""
+    id: str = Field(..., description="Unique flight option ID")
+    segments: List[FlightSegment] = Field(..., description="Flight segments (legs)")
+    total_duration: str = Field(..., description="Total journey time")
+    stops: int = Field(0, description="Number of stops (0 = direct)")
+    price: float = Field(..., description="Price in local currency")
+    currency: str = Field("INR", description="Currency code")
+    price_formatted: str = Field(..., description="Formatted price, e.g., '₹45,000'")
+    booking_class: str = Field("Economy", description="Cabin class")
+
+
+class FlightCardProps(BaseModel):
+    """Props for flight_card component."""
+    origin: str = Field(..., description="Origin city")
+    destination: str = Field(..., description="Destination city")
+    departure_date: str = Field(..., description="Departure date YYYY-MM-DD")
+    return_date: Optional[str] = Field(None, description="Return date for round trips")
+    passengers: int = Field(1, description="Number of passengers")
+    flights: List[FlightOption] = Field(default=[], description="Available flight options")
+    show_return: bool = Field(False, description="Show return flights")
+
+
+# ============================================================
 # UI COMPONENT WRAPPER
 # ============================================================
 
@@ -263,6 +306,7 @@ class UIComponent(BaseModel):
         ConfirmationProps,
         MapViewProps,
         RouteViewProps,
+        FlightCardProps,
         dict  # Fallback for unknown types
     ] = Field(default_factory=dict)
     required: bool = Field(False, description="Whether user must interact before continuing")

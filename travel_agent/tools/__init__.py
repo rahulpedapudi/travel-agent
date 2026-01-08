@@ -70,6 +70,12 @@ from .ui_tools import (
     render_route,
 )
 
+# Flight tools
+from .flight_tools import (
+    search_flights,
+    render_flights,
+)
+
 
 # Grouped exports by agent
 
@@ -78,6 +84,7 @@ RESEARCH_TOOLS = [
     get_current_datetime,
     search_transport,
     search_travel_info,
+    search_flights,  # Mock flight data
     add_places,  # To save results to state
     get_preferences,  # To read user preferences
 ]
