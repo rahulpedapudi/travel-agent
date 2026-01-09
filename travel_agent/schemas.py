@@ -317,10 +317,11 @@ class UIComponent(BaseModel):
 # ============================================================
 
 class ChatResponse(BaseModel):
-    """Enhanced chat response with optional UI component."""
+    """Enhanced chat response with optional UI component(s)."""
     response: str = Field(..., description="Text response from agent")
     session_id: str = Field(..., description="Session identifier")
-    ui: Optional[UIComponent] = Field(None, description="Optional UI component to render")
+    ui: Optional[UIComponent] = Field(None, description="Primary UI component to render")
+    ui_components: Optional[List[dict]] = Field(None, description="Multiple UI components (used in demo mode)")
     
     class Config:
         json_schema_extra = {

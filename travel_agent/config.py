@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # LLM Model
     llm_model: str = Field("gemini-2.5-flash", description="LLM model for all agents")
     
+    # Demo Mode - bypasses LLM with mock data
+    # demo_mode: bool = Field(False, description="Enable demo mode with mock data")
+    demo_mode: bool = Field(True, description="Enable demo mode with mock data")
+    
     # CORS
     allowed_origins: str = Field("*", description="Comma-separated allowed origins")
     
@@ -42,7 +46,9 @@ def get_settings() -> Settings:
     return Settings()
 
 
-# Module-level constant for LLM model - safe to import at module level
-# This uses environment variable directly to avoid circular import issues
+# Module-level constants - safe to import at module level
+# These use environment variables directly to avoid circular import issues
 import os
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
+

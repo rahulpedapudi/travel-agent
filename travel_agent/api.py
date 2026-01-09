@@ -154,8 +154,11 @@ except Exception as e:
     logger.warning(f"Firebase not initialized (auth disabled): {e}")
 
 # Log the LLM model being used
-from .config import LLM_MODEL
+from .config import LLM_MODEL, DEMO_MODE
 logger.info(f"LLM Model: {LLM_MODEL}")
+if DEMO_MODE:
+    logger.info("🎭 DEMO MODE ENABLED - Using mock data instead of LLM")
+    from .demo_data import get_demo_response, detect_destination
 
 
 # ============================================================
@@ -251,6 +254,18 @@ async def chat(request: ChatRequest, user: dict = Depends(get_current_user)):
         # Use Firebase user ID for session (ensures each user has their own conversation)
         user_id = user["uid"]
         session_id = request.session_id or user_id
+        
+        # DEMO MODE: Return mock data if enabled and destination detected
+        if DEMO_MODE:
+            demo_response = get_demo_response(request.message, session_id)
+            if demo_response:
+                logger.info(f"🎭 Demo mode: Returning mock data for detected destination")
+                return ChatResponse(
+                    response=demo_response["response"],
+                    session_id=session_id,
+                    ui=None,  # Use ui_components array instead
+                    ui_components=demo_response.get("ui_components", [])
+                )
         
         # Get or create session
         session = await session_service.get_session(
